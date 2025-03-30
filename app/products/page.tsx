@@ -99,7 +99,8 @@ export default function ProductsPage() {
         setProducts(data)
 
         // カテゴリーの抽出
-        const uniqueCategories = Array.from(new Set(data.map((product: Product) => product.category as string)))
+        const uniqueCategories = Array.from(new Set(data.map((product: Product) => product.category))) as string[]
+
         setCategories(uniqueCategories)
 
         // 初期選択状態を設定
