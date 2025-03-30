@@ -121,6 +121,12 @@ export function CategoryOrders({
     return dateTimeB - dateTimeA // 降順（最新が先頭）
   })
 
+  // 日付をフォーマットする関数（undefinedのチェックを追加）
+  const formatDate = (date: Date | undefined): string => {
+    if (!date) return "出荷日を選択"
+    return format(date, "yyyy年MM月dd日", { locale: ja })
+  }
+
   return (
     <div className="divide-y divide-gray-100">
       {sortedOrders.map((order) => {
@@ -131,6 +137,7 @@ export function CategoryOrders({
         if (promotionalItems.length === 0) return null
 
         const isExpanded = expandedOrders[order.orderNumber] || false
+        const selectedDate = selectedDates[order.orderNumber]
 
         return (
           <div key={order.orderNumber} className="py-4 px-6">
@@ -150,21 +157,16 @@ export function CategoryOrders({
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn(
-                        "justify-start text-left font-normal bg-white",
-                        !selectedDates[order.orderNumber] && "text-gray-500",
-                      )}
+                      className={cn("justify-start text-left font-normal bg-white", !selectedDate && "text-gray-500")}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDates[order.orderNumber]
-                        ? format(selectedDates[order.orderNumber], "yyyy年MM月dd日", { locale: ja })
-                        : "出荷日を選択"}
+                      {formatDate(selectedDate)}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="end">
                     <Calendar
                       mode="single"
-                      selected={selectedDates[order.orderNumber]}
+                      selected={selectedDate}
                       onSelect={(date) => onDateSelect(order.orderNumber, date)}
                       initialFocus
                     />
