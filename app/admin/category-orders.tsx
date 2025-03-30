@@ -10,6 +10,50 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
+// 型定義
+type OrderItem = {
+  name: string
+  size: string
+  color: string
+  quantity: string
+}
+
+type Order = {
+  id: number
+  orderNumber: string
+  orderDate: string
+  orderTime: string
+  storeName: string
+  email: string
+  items: OrderItem[]
+  status: string
+  shippingDate?: string | null
+}
+
+type AvailableItem = {
+  id: string
+  category: string
+  name: string
+  colors?: string[]
+  sizes?: string[]
+  amounts?: number[]
+  prices?: string[]
+  pricesPerPiece?: string[]
+  leadTime: string
+  partnerName?: string
+}
+
+type CategoryOrdersProps = {
+  orders: Order[]
+  category: string
+  onDateSelect: (orderNumber: string, date: Date | undefined) => void
+  formatDateTime: (dateStr: string, timeStr: string) => string
+  getStatusColor: (status: string) => string
+  selectedDates: { [key: string]: Date | undefined }
+  availableItems: AvailableItem[]
+  getPromotionalItems: (order: Order) => OrderItem[]
+}
+
 // 特定の販促グッズリストを定義
 const specialPromotionalItems = [
   "ポイントカード",
@@ -36,7 +80,7 @@ export function CategoryOrders({
   selectedDates,
   availableItems,
   getPromotionalItems,
-}) {
+}: CategoryOrdersProps) {
   const [expandedOrders, setExpandedOrders] = useState<{ [key: string]: boolean }>({})
 
   // 注文の展開/折りたたみを切り替える
@@ -48,7 +92,7 @@ export function CategoryOrders({
   }
 
   // 数量の表示方法を修正する関数
-  const formatQuantity = (item) => {
+  const formatQuantity = (item: OrderItem) => {
     // 特定のアイテムの場合は、数量を「XX枚」として表示
     if (isSpecialItem(item.name)) {
       return `${item.quantity}枚`
