@@ -50,7 +50,7 @@ const isSpecialItem = (itemName: string): boolean => {
 }
 
 // 数量の表示方法を修正する関数
-const formatQuantity = (item) => {
+const formatQuantity = (item: CartItem) => {
   // 特定の販促グッズの場合は、数量をそのまま表示
   if (isSpecialItem(item.item_name)) {
     return `${item.quantity}枚`
