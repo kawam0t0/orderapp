@@ -99,7 +99,7 @@ export default function ProductsPage() {
         setProducts(data)
 
         // カテゴリーの抽出
-        const uniqueCategories = [...new Set(data.map((product: Product) => product.category))]
+        const uniqueCategories: string[] = [...new Set(data.map((product: Product) => product.category))]
         setCategories(uniqueCategories)
 
         // 初期選択状態を設定
@@ -210,7 +210,7 @@ export default function ProductsPage() {
         itemPrice = productPrices[product.id][size].toString()
       } else if (product.name.includes("Tシャツ") && TSHIRT_PRICES[size]) {
         itemPrice = TSHIRT_PRICES[size].toString()
-      } else if (product.name.includes("フーディ") && HOODIE_PRICES[size]) {
+      } else if (product.name.includes("フ��ディ") && HOODIE_PRICES[size]) {
         itemPrice = HOODIE_PRICES[size].toString()
       } else if (product.prices && product.prices.length > 0) {
         itemPrice = product.prices[0]
