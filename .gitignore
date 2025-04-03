@@ -30,21 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-my-project250124-448803-825a95445892.json
-*.json.json
-my-project250124-448803-825a95445892.json
-*.json.json
-
 # Google Cloud認証情報
+my-project250124-448803-c71049e01956.json
 my-project250124-448803-825a95445892.json
 *-service-account*.json
 *credentials*.json
@@ -52,15 +39,12 @@ my-project250124-448803-825a95445892.json
 *.pem
 
 # 環境変数ファイル
-.env
-.env.local
-.env.development
-.env.production
-.env*.local
+.env*
+!.env.example
 
-# その他の一般的な除外ファイル
-node_modules
-.next
+# vercel
 .vercel
-.DS_Store
-*.log
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
