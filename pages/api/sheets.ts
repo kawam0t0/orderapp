@@ -133,13 +133,13 @@ function processAvailableItems(rows: any[][]) {
   // グループ化したデータを配列に変換
   return Array.from(groupedItems.values()).map((item) => {
     // 数量を昇順にソート
-    const sortedAmounts = Array.from(item.amounts).sort((a: number, b: number) => a - b)
+    const sortedAmounts = Array.from(item.amounts as Set<number>).sort((a, b) => a - b)
 
     // 対応する価格の配列を作成
-    const sortedPrices = sortedAmounts.map((amount: number) => item.prices[amount] || "0")
+    const sortedPrices = sortedAmounts.map((amount) => item.prices[amount] || "0")
 
     // 対応する1個あたりの価格の配列を作成
-    const sortedPricesPerPiece = sortedAmounts.map((amount: number) => item.pricesPerPiece[amount] || "0")
+    const sortedPricesPerPiece = sortedAmounts.map((amount) => item.pricesPerPiece[amount] || "0")
 
     return {
       id: item.id,
