@@ -30,6 +30,17 @@ const isApparelItem = (name: string): boolean => {
   return apparelItems.some((item) => name.includes(item))
 }
 
+// 数量の表示方法を修正する関数
+const formatQuantity = (item) => {
+  // 特定の販促グッズの場合は、数量をそのまま表示
+  if (specialPromotionalItems.some((name) => item.item_name.includes(name))) {
+    return `${item.quantity}枚`
+  }
+
+  // その他の商品は従来通りの処理
+  return `${item.quantity}${item.item_name.includes("液剤") ? "本" : "枚"}`
+}
+
 // 商品タイプの定義
 type CartItem = {
   id: string
@@ -44,23 +55,39 @@ type CartItem = {
   selectedSize?: string
   selectedQuantity?: number | string
   quantity: number
+  imageUrl?: string // 画像URLを追加
 }
 
-// 数量の表示方法を修正する関数
-const formatQuantity = (item: CartItem) => {
-  // 特定の販促グッズの場合は、数量をそのまま表示
-  if (specialPromotionalItems.some((name) => item.item_name.includes(name))) {
-    return `${item.quantity}枚`
-  }
+// COMING SOON画像のURL
+const COMING_SOON_IMAGE_URL =
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/0005720_coming-soon-page_550-GJuRp7f7JXrp3ZSP6hK2ihMLTP2abk.webp"
 
-  // その他の商品は従来通りの処理
-  return `${item.quantity}${item.item_name.includes("液剤") ? "本" : "枚"}`
+// Google DriveのURLを直接表示可能な形式に変換する関数
+const convertGoogleDriveUrl = (url: string): string => {
+  try {
+    // Google DriveのURLかどうかを確認
+    if (url && url.includes("drive.google.com/file/d/")) {
+      // ファイルIDを抽出
+      const fileIdMatch = url.match(/\/d\/([^/]+)/)
+      if (fileIdMatch && fileIdMatch[1]) {
+        const fileId = fileIdMatch[1]
+        // 直接表示可能なURLに変換
+        return `https://drive.google.com/uc?export=view&id=${fileId}`
+      }
+    }
+    return url
+  } catch (error) {
+    console.error("Error converting Google Drive URL:", error)
+    return url
+  }
 }
 
 export default function CartPage() {
   const router = useRouter()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [quantities, setQuantities] = useState<{ [key: string]: number }>({})
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [products, setProducts] = useState<any[]>([]) // 商品データを保持するstate
 
   // カート情報の取得
   useEffect(() => {
@@ -69,11 +96,70 @@ export default function CartPage() {
       try {
         const items = JSON.parse(savedCart)
         setCartItems(items)
+
+        // 数量の初期化
+        const initialQuantities: { [key: string]: number } = {}
+        items.forEach((item: CartItem) => {
+          initialQuantities[item.id] = item.quantity || 1
+        })
+        setQuantities(initialQuantities)
       } catch (e) {
         console.error("Failed to parse cart data:", e)
       }
     }
+
+    // 商品データを取得して画像URLを取得
+    fetchProducts()
   }, [])
+
+  // 商品データを取得する関数
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch("/api/sheets?sheet=Available_items")
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data)
+
+        // カート内の商品に画像URLを追加
+        if (data && data.length > 0) {
+          const savedCart = localStorage.getItem("cart")
+          if (savedCart) {
+            const items = JSON.parse(savedCart)
+            const updatedItems = items.map((item: CartItem) => {
+              // 商品名で一致する商品を検索
+              const matchingProduct = data.find((product) => product.name === item.item_name)
+              if (matchingProduct && matchingProduct.imageUrl) {
+                return {
+                  ...item,
+                  imageUrl: convertGoogleDriveUrl(matchingProduct.imageUrl),
+                }
+              }
+              return item
+            })
+            setCartItems(updatedItems)
+            localStorage.setItem("cart", JSON.stringify(updatedItems))
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error)
+    }
+  }
+
+  // 数量変更の処理
+  const updateQuantity = (itemId: string, newQuantity: number) => {
+    if (newQuantity < 1) return
+
+    setQuantities((prev) => ({
+      ...prev,
+      [itemId]: newQuantity,
+    }))
+
+    // カート内の商品数量を更新
+    const updatedCart = cartItems.map((item) => (item.id === itemId ? { ...item, quantity: newQuantity } : item))
+    setCartItems(updatedCart)
+    localStorage.setItem("cart", JSON.stringify(updatedCart))
+  }
 
   // 商品の削除
   const removeItem = (itemId: string) => {
@@ -113,26 +199,32 @@ export default function CartPage() {
     return calculateSubtotal() * 0.1
   }
 
-  // 合計金額の計算
+  // 合計金額の計算（税込み）
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax()
+    // 小計に消費税を加算
+    const taxInclusiveTotal = calculateSubtotal() + calculateTax()
+    return taxInclusiveTotal
   }
 
   // 商品画像の取得
-  const getProductImage = (category: string, name: string) => {
-    // カテゴリーに基づいたプレースホルダー画像を返す
-    switch (category) {
-      case "アパレル":
-        return `/placeholder.svg?height=300&width=300&text=👕%20${encodeURIComponent(name)}`
-      case "販促グッズ":
-        return `/placeholder.svg?height=300&width=300&text=🎁%20${encodeURIComponent(name)}`
-      case "液剤":
-        return `/placeholder.svg?height=300&width=300&text=💧%20${encodeURIComponent(name)}`
-      case "クロス":
-        return `/placeholder.svg?height=300&width=300&text=🧹%20${encodeURIComponent(name)}`
-      default:
-        return `/placeholder.svg?height=300&width=300&text=${encodeURIComponent(category)}%0A${encodeURIComponent(name)}`
+  const getProductImage = (item: CartItem) => {
+    // 商品に画像URLがある場合はそれを使用
+    if (item.imageUrl && item.imageUrl.trim() !== "") {
+      return item.imageUrl
     }
+
+    // 商品名で一致する商品を検索
+    const matchingProduct = products.find((product) => product.name === item.item_name)
+    if (matchingProduct && matchingProduct.imageUrl) {
+      return convertGoogleDriveUrl(matchingProduct.imageUrl)
+    }
+
+    // カテゴリーに基づいたプレースホルダー画像を返す
+    const category = item.item_category
+    const name = item.item_name
+
+    // COMING SOON画像を使用
+    return COMING_SOON_IMAGE_URL
   }
 
   // 注文処理
@@ -141,26 +233,33 @@ export default function CartPage() {
   }
 
   // 納期の表示
-  const displayDeliveryTime = (leadTime: string | undefined) => {
-    // leadTimeがundefinedまたはnullの場合、デフォルト値を返す
-    if (!leadTime) return "納期未定"
+  const displayDeliveryTime = (leadTime: string, category: string) => {
+    // カテゴリーに基づいた納期計算
+    if (category === "販促グッズ") {
+      // 販促グッズは約3週間
+      const deliveryDate = addWeeks(new Date(), 3)
+      return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
+    } else if (category === "液剤") {
+      // 液剤は約3日
+      const deliveryDate = new Date()
+      deliveryDate.setDate(deliveryDate.getDate() + 3)
+      return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
+    }
 
-    // "即日"の場合はそのまま返す
+    // その他のカテゴリーは従来通りの計算
     if (leadTime === "即日") return "即日出荷"
-
-    // X週間の形式から数値を抽出
     const weeks = Number(leadTime.match(/\d+/)?.[0] || "0")
-
-    // 現在日付からX週間後の日付を計算
     const deliveryDate = addWeeks(new Date(), weeks)
-
-    // フォーマット: ○○月○○日頃
-    return format(deliveryDate, "M月d日頃", { locale: ja })
+    return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
   }
 
-  // 特定のアイテムかどうかを判定する関数
-  const isSpecialItem = (itemName: string): boolean => {
-    return specialPromotionalItems.some((name) => itemName.includes(name))
+  // 単位を取得する関数
+  const getUnit = (itemName: string) => {
+    // 特定の販促グッズの場合は「枚」を返す
+    if (specialPromotionalItems.some((name) => itemName.includes(name))) {
+      return "枚"
+    }
+    return isApparelItem(itemName) ? "枚" : "個"
   }
 
   return (
@@ -203,10 +302,14 @@ export default function CartPage() {
                       <div className="flex flex-col sm:flex-row gap-4">
                         <div className="relative h-24 w-24 bg-gray-100 rounded-md flex-shrink-0">
                           <Image
-                            src={getProductImage(item.item_category, item.item_name) || "/placeholder.svg"}
+                            src={getProductImage(item) || "/placeholder.svg"}
                             alt={item.item_name}
                             fill
                             className="object-contain p-2"
+                            onError={(e) => {
+                              console.error(`Error loading image for ${item.item_name}, using fallback`)
+                              e.currentTarget.src = COMING_SOON_IMAGE_URL
+                            }}
                           />
                           <Badge className="absolute -top-2 -right-2 bg-blue-600 text-xs">{item.item_category}</Badge>
                         </div>
@@ -220,25 +323,25 @@ export default function CartPage() {
                           <div className="text-sm text-gray-500 mb-2">
                             {item.selectedColor && <span className="mr-2">カラー: {item.selectedColor}</span>}
                             {item.selectedSize && <span className="mr-2">サイズ: {item.selectedSize}</span>}
-
-                            {/* 特定のアイテムの場合は、selectedQuantityを「XX枚」として表示 */}
-                            {isSpecialItem(item.item_name) && item.selectedQuantity && (
-                              <span className="mr-2">{item.selectedQuantity}枚</span>
+                            {item.item_category === "販促グッズ" && item.selectedQuantity && (
+                              <span className="mr-2">
+                                {/* 特定の販促グッズの場合は「枚」を表示 */}
+                                {specialPromotionalItems.some((name) => item.item_name.includes(name))
+                                  ? `${item.selectedQuantity}枚セット`
+                                  : `${item.selectedQuantity}個セット`}
+                              </span>
                             )}
-
-                            {/* 特定のアイテム以外の販促グッズの場合 */}
-                            {!isSpecialItem(item.item_name) &&
-                              item.item_category === "販促グッズ" &&
-                              item.selectedQuantity && <span className="mr-2">{item.selectedQuantity}個</span>}
-
-                            <span className="text-green-600">納期: {displayDeliveryTime(item.lead_time)}</span>
+                            <span className="text-green-600">
+                              納期: {displayDeliveryTime(item.lead_time, item.item_category)}
+                            </span>
                           </div>
 
                           <div className="flex justify-between items-center mt-2">
-                            {/* 特定のアイテム以外の場合のみ数量を表示 */}
-                            {!isSpecialItem(item.item_name) && (
-                              <div className="text-sm text-gray-600">数量: {formatQuantity(item)}</div>
-                            )}
+                            <div className="flex items-center">
+                              <span>
+                                {item.quantity} {getUnit(item.item_name)}
+                              </span>
+                            </div>
 
                             {/* 削除ボタン */}
                             <Button
@@ -276,7 +379,7 @@ export default function CartPage() {
                     </div>
                     <Separator />
                     <div className="flex justify-between font-semibold text-lg">
-                      <span>合計</span>
+                      <span>合計（税込）</span>
                       <span>¥{calculateTotal().toLocaleString()}</span>
                     </div>
 

@@ -34,27 +34,29 @@ type StoreInfo = {
   id: string
 }
 
-// 特定のアイテムかどうかを判定する関数
-const isSpecialItem = (itemName: string): boolean => {
-  return specialPromotionalItems.some((name) => itemName.includes(name))
+type PartnerInfo = {
+  name: string
+  email: string
+  items: Product[]
 }
 
-// スプレッドシートに保存する前の数量処理を修正する関数
-const processOrderItems = (items: Product[]) => {
-  return items.map((item) => {
-    // 特定の販促グッズの場合は、selectedQuantityを数量として使用
-    if (isSpecialItem(item.item_name) && item.selectedQuantity) {
-      return {
-        ...item,
-        quantity: item.selectedQuantity, // selectedQuantityを数量として使用
-      }
-    }
+type AvailableItem = {
+  category: string
+  name: string
+  partnerName: string
+  partnerEmail: string
+}
 
-    // 販促グッズで選択数量がある場合は、その数量を使用
-    if (item.item_category === "販促グッズ" && item.selectedQuantity) {
+// スプレッドシートに保存する前の数量処理を修正る関数
+const processOrderItems = (items) => {
+  return items.map((item) => {
+    // 特定の販促グッズの場合は、selectedQuantity を quantity として使用
+    if (specialPromotionalItems.some((name) => item.item_name.includes(name))) {
+      // selectedQuantity が存在する場合はそれを使用、存在しない場合は元の quantity を使用
+      const updatedQuantity = item.selectedQuantity ? Number(item.selectedQuantity) : item.quantity
       return {
         ...item,
-        quantity: item.selectedQuantity, // 選択された数量を使用
+        quantity: updatedQuantity, // 選択された数量を quantity として設定
       }
     }
 
@@ -80,6 +82,88 @@ function generateOrderNumber(): string {
   const hash = crypto.createHash("md5").update(timestamp).digest("hex")
   const numericHash = Number.parseInt(hash.substring(0, 6), 16) % 100000
   return "ORD-" + numericHash.toString().padStart(5, "0")
+}
+
+// 商品情報とパートナー情報を取得する関数
+async function getAvailableItemsWithPartners(): Promise<AvailableItem[]> {
+  try {
+    const auth = await getAuthToken()
+    const sheets = google.sheets({
+      version: "v4",
+      auth,
+    })
+
+    // Available_itemsシートからデータを取得
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: "Available_items!A2:J", // J列までのデータを取得
+    })
+
+    if (!response.data.values) {
+      console.log("Available_itemsシートにデータがありません")
+      return []
+    }
+
+    console.log(`Available_itemsシートから ${response.data.values.length} 行のデータを取得しました`)
+
+    // 商品データを処理
+    const items = response.data.values.map((row) => {
+      const category = row[0] || "" // A列: カテゴリ
+      const name = row[2] || "" // C列: 商品名（修正：B列ではなくC列から取得）
+      const partnerName = row[8] || "" // I列: パートナー名
+      const partnerEmail = row[9] || "" // J列: パートナーメールアドレス
+
+      // デバッグ用に各行のデータをログ出力
+      if (partnerName && partnerEmail) {
+        console.log(`商品データ: カテゴリ=${category}, 名前=${name}, パートナー=${partnerName}, メール=${partnerEmail}`)
+      }
+
+      return {
+        category,
+        name,
+        partnerName,
+        partnerEmail,
+      }
+    })
+
+    // パートナー情報があるアイテムの数をカウント
+    const itemsWithPartners = items.filter((item) => item.partnerName && item.partnerEmail)
+    console.log(`パートナー情報がある商品: ${itemsWithPartners.length}/${items.length}`)
+
+    return items
+  } catch (error) {
+    console.error("Error fetching available items:", error)
+    return []
+  }
+}
+
+// 商品名が一致するかどうかを判定する関数
+function matchProductName(orderItemName: string, availableItemName: string): boolean {
+  // 両方の商品名を小文字に変換して比較
+  const normalizedOrderItem = orderItemName.toLowerCase().trim()
+  const normalizedAvailableItem = availableItemName.toLowerCase().trim()
+
+  // 完全一致の場合
+  if (normalizedOrderItem === normalizedAvailableItem) {
+    return true
+  }
+
+  // 部分一致の場合（どちらかがもう一方を含む）
+  if (normalizedOrderItem.includes(normalizedAvailableItem) || normalizedAvailableItem.includes(normalizedOrderItem)) {
+    return true
+  }
+
+  // 単語単位での一致チェック
+  const orderWords = normalizedOrderItem.split(/\s+/)
+  const availableWords = normalizedAvailableItem.split(/\s+/)
+
+  // 共通する単語が多い場合に一致と判定
+  const commonWords = orderWords.filter((word) => availableWords.includes(word))
+  if (commonWords.length > 0 && commonWords.length >= Math.min(orderWords.length, availableWords.length) / 2) {
+    return true
+  }
+
+  return false
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -133,7 +217,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         rowData[baseIndex] = item.item_name
         rowData[baseIndex + 1] = item.selectedSize || ""
         rowData[baseIndex + 2] = item.selectedColor || ""
-        rowData[baseIndex + 3] = item.quantity.toString()
+        rowData[baseIndex + 3] = item.quantity.toString() // 処理済みの数量を使用
       }
     })
 
@@ -174,69 +258,107 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error("メール送信エラー:", emailError)
     }
 
-    // パートナー別に商品をグループ化
-    const partnerItems = new Map<string, Product[]>()
+    // 商品情報とパートナー情報を取得
+    const availableItems = await getAvailableItemsWithPartners()
 
-    // パートナー名が設定されている商品をグループ化
+    // 発注された商品の一覧をログ出力
+    console.log(
+      "発注された商品:",
+      processedItems.map((item) => item.item_name),
+    )
+
+    // パートナー別に商品をグループ化
+    const partnerGroups: { [key: string]: PartnerInfo } = {}
+
+    // 各商品のパートナー情報を設定
     processedItems.forEach((item) => {
-      if (item.partnerName) {
-        if (!partnerItems.has(item.partnerName)) {
-          partnerItems.set(item.partnerName, [])
+      console.log(`商品 ${item.item_name} のパートナー情報を検索中...`)
+
+      // 商品名に一致する商品情報を検索
+      const matchingItems = availableItems.filter((avItem) => matchProductName(item.item_name, avItem.name))
+
+      if (matchingItems.length > 0) {
+        // 最も一致度の高い商品を選択（ここでは単純に最初のものを使用）
+        const matchingItem = matchingItems[0]
+
+        if (matchingItem.partnerName && matchingItem.partnerEmail) {
+          const partnerName = matchingItem.partnerName
+          const partnerEmail = matchingItem.partnerEmail
+
+          console.log(`商品 ${item.item_name} のパートナー: ${partnerName}, メール: ${partnerEmail}`)
+
+          // パートナーグループが存在しない場合は作成
+          if (!partnerGroups[partnerName]) {
+            partnerGroups[partnerName] = {
+              name: partnerName,
+              email: partnerEmail,
+              items: [],
+            }
+          }
+
+          // 商品をパートナーグループに追加
+          partnerGroups[partnerName].items.push(item)
+        } else {
+          console.log(
+            `商品 ${item.item_name} のパートナー情報が不完全です: 名前=${matchingItem.partnerName}, メール=${matchingItem.partnerEmail}`,
+          )
         }
-        partnerItems.get(item.partnerName)?.push(item)
+      } else {
+        console.log(`商品 ${item.item_name} に一致する商品情報が見つかりません`)
+
+        // 部分一致で検索してみる
+        console.log(
+          "Available_itemsシートの商品名一覧:",
+          availableItems.map((item) => item.name),
+        )
       }
     })
 
+    // デバッグログを追加
+    console.log(
+      "Partner groups:",
+      Object.values(partnerGroups).map((group) => ({
+        partnerName: group.name,
+        partnerEmail: group.email,
+        itemCount: group.items.length,
+        items: group.items.map((item) => item.item_name),
+      })),
+    )
+
+    // パートナーグループが空の場合は早期リターン
+    if (Object.keys(partnerGroups).length === 0) {
+      console.log("パートナー商品がないため、パートナーメールは送信しません")
+      res.status(200).json({ success: true, orderNumber })
+      return
+    }
+
     // 各パートナーにメールを送信（非同期処理を並列化）
-    const partnerEmailPromises = Array.from(partnerItems.entries()).map(async ([partnerName, partnerProducts]) => {
+    const partnerEmailPromises = Object.values(partnerGroups).map(async (partnerInfo) => {
       try {
-        console.log(`Sending email to partner: ${partnerName}`)
+        console.log(`Sending email to partner: ${partnerInfo.name} (${partnerInfo.email})`)
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
 
-        // パートナー情報を取得
-        const partnerResponse = await fetch(
-          `${baseUrl}/api/get-partner-info?partnerName=${encodeURIComponent(partnerName)}`,
-        )
+        // パートナーメールの送信
+        const partnerEmailResponse = await fetch(`${baseUrl}/api/send-partner-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: partnerInfo.email,
+            subject: `【SPLASH'N'GO!】発注通知 (${orderNumber})`,
+            orderNumber,
+            storeName: storeInfo.name,
+            items: partnerInfo.items,
+          }),
+        })
 
-        if (!partnerResponse.ok) {
-          throw new Error(`パートナー情報の取得に失敗しました: ${partnerName}`)
-        }
-
-        const partnerData = await partnerResponse.json()
-        console.log(`Partner data for ${partnerName}:`, partnerData.partners?.length || 0)
-
-        if (partnerData.partners && partnerData.partners.length > 0) {
-          const partnerEmail = partnerData.partners[0].email
-
-          if (partnerEmail) {
-            console.log(`Sending partner email to: ${partnerEmail}`)
-
-            // パートナーメールの送信 - 件名からパートナー名を削除
-            const partnerEmailResponse = await fetch(`${baseUrl}/api/send-partner-email`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                to: partnerEmail,
-                subject: `【SPLASH'N'GO!】発注通知 (${orderNumber})`, // パートナー名を削除
-                orderNumber,
-                storeName: storeInfo.name,
-                items: partnerProducts,
-              }),
-            })
-
-            if (!partnerEmailResponse.ok) {
-              console.error(`${partnerName}へのメール送信に失敗しました:`, await partnerEmailResponse.text())
-            } else {
-              console.log(`${partnerName}へのメール送信成功`)
-            }
-          } else {
-            console.error(`${partnerName}のメールアドレスが見つかりません`)
-          }
+        const responseText = await partnerEmailResponse.text()
+        if (!partnerEmailResponse.ok) {
+          console.error(`${partnerInfo.name}へのメール送信に失敗しました:`, responseText)
         } else {
-          console.error(`${partnerName}の情報が見つかりません`)
+          console.log(`${partnerInfo.name}へのメール送信成功:`, responseText)
         }
       } catch (error) {
-        console.error(`${partnerName}へのメール処理エラー:`, error)
+        console.error(`${partnerInfo.name}へのメール処理エラー:`, error)
       }
     })
 

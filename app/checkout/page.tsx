@@ -42,17 +42,13 @@ type CartItem = {
   quantity: number
   item_price: string | string[]
   lead_time: string
-}
-
-// 特定のアイテムかどうかを判定する関数
-const isSpecialItem = (itemName: string): boolean => {
-  return specialPromotionalItems.some((name) => itemName.includes(name))
+  imageUrl?: string // 画像URLを追加
 }
 
 // 数量の表示方法を修正する関数
 const formatQuantity = (item: CartItem) => {
   // 特定の販促グッズの場合は、数量をそのまま表示
-  if (isSpecialItem(item.item_name)) {
+  if (specialPromotionalItems.some((name) => item.item_name.includes(name))) {
     return `${item.quantity}枚`
   }
 
@@ -70,6 +66,30 @@ type StoreInfo = {
   manager?: string
 }
 
+// COMING SOON画像のURL
+const COMING_SOON_IMAGE_URL =
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/0005720_coming-soon-page_550-GJuRp7f7JXrp3ZSP6hK2ihMLTP2abk.webp"
+
+// Google DriveのURLを直接表示可能な形式に変換する関数
+const convertGoogleDriveUrl = (url: string): string => {
+  try {
+    // Google DriveのURLかどうかを確認
+    if (url && url.includes("drive.google.com/file/d/")) {
+      // ファイルIDを抽出
+      const fileIdMatch = url.match(/\/d\/([^/]+)/)
+      if (fileIdMatch && fileIdMatch[1]) {
+        const fileId = fileIdMatch[1]
+        // 直接表示可能なURLに変換
+        return `https://drive.google.com/uc?export=view&id=${fileId}`
+      }
+    }
+    return url
+  } catch (error) {
+    console.error("Error converting Google Drive URL:", error)
+    return url
+  }
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -77,6 +97,7 @@ export default function CheckoutPage() {
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null)
   const [shippingMethod, setShippingMethod] = useState("standard")
   const [orderError, setOrderError] = useState("")
+  const [products, setProducts] = useState<any[]>([]) // 商品データを保持するstate
 
   // カートデータとストア情報の取得
   useEffect(() => {
@@ -105,7 +126,44 @@ export default function CheckoutPage() {
     } else {
       fetchStoreInfo()
     }
+
+    // 商品データを取得して画像URLを取得
+    fetchProducts()
   }, [])
+
+  // 商品データを取得する関数
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch("/api/sheets?sheet=Available_items")
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data)
+
+        // カート内の商品に画像URLを追加
+        if (data && data.length > 0) {
+          const savedCart = localStorage.getItem("cart")
+          if (savedCart) {
+            const items = JSON.parse(savedCart)
+            const updatedItems = items.map((item: CartItem) => {
+              // 商品名で一致する商品を検索
+              const matchingProduct = data.find((product) => product.name === item.item_name)
+              if (matchingProduct && matchingProduct.imageUrl) {
+                return {
+                  ...item,
+                  imageUrl: convertGoogleDriveUrl(matchingProduct.imageUrl),
+                }
+              }
+              return item
+            })
+            setCartItems(updatedItems)
+            localStorage.setItem("cart", JSON.stringify(updatedItems))
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching products:", error)
+    }
+  }
 
   // ストア詳細情報の取得
   const fetchStoreDetails = async (storeId: string) => {
@@ -156,7 +214,24 @@ export default function CheckoutPage() {
     }
   }
 
-  // 商品価格の計算
+  // 商品画像の取得
+  const getProductImage = (item: CartItem) => {
+    // 商品に画像URLがある場合はそれを使用
+    if (item.imageUrl && item.imageUrl.trim() !== "") {
+      return item.imageUrl
+    }
+
+    // 商品名で一致する商品を検索
+    const matchingProduct = products.find((product) => product.name === item.item_name)
+    if (matchingProduct && matchingProduct.imageUrl) {
+      return convertGoogleDriveUrl(matchingProduct.imageUrl)
+    }
+
+    // COMING SOON画像を使用
+    return COMING_SOON_IMAGE_URL
+  }
+
+  // 商品価格の計算（修正版）
   const calculateItemTotal = (item: CartItem) => {
     // アパレル商品の場合
     if (isApparelItem(item.item_name)) {
@@ -168,17 +243,33 @@ export default function CheckoutPage() {
     }
     // 販促グッズの場合
     else if (item.item_category === "販促グッズ" && item.selectedQuantity) {
+      // 文字列から数値に変換する際に、カンマを取り除く
+      let price: number
+
       if (Array.isArray(item.item_price)) {
         const quantityIndex = (
           Array.isArray(item.selectedQuantity) ? item.selectedQuantity : [item.selectedQuantity]
         ).findIndex((qty) => String(qty) === String(item.selectedQuantity))
+
         if (quantityIndex !== -1) {
-          return Number(item.item_price[quantityIndex].replace(/[^0-9.-]+/g, ""))
+          const priceStr = item.item_price[quantityIndex]
+          price = Number(String(priceStr).replace(/[^0-9.-]+/g, ""))
+        } else {
+          price = 0
         }
+      } else {
+        price =
+          typeof item.item_price === "string"
+            ? Number(item.item_price.replace(/[^0-9.-]+/g, ""))
+            : Number(item.item_price)
       }
-      return typeof item.item_price === "string"
-        ? Number(item.item_price.replace(/[^0-9.-]+/g, "")) * item.quantity
-        : Number(item.item_price) * item.quantity
+
+      // ポイントカードなどの特定商品は、単価×数量ではなく、セット価格をそのまま使用
+      if (specialPromotionalItems.some((name) => item.item_name.includes(name))) {
+        return price
+      } else {
+        return price * item.quantity
+      }
     }
     // その他の商品
     else {
@@ -191,20 +282,23 @@ export default function CheckoutPage() {
   }
 
   // 納期の計算
-  const calculateDeliveryDate = (leadTime: string | undefined) => {
-    // leadTimeがundefinedまたはnullの場合、デフォルト値を返す
-    if (!leadTime) return "納期未定"
+  const calculateDeliveryDate = (leadTime: string, category: string) => {
+    // カテゴリーに基づいた納期計算
+    if (category === "販促グッズ") {
+      // 販促グッズは約3週間
+      const deliveryDate = addWeeks(new Date(), 3)
+      return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
+    } else if (category === "液剤") {
+      // 液剤は約3日
+      const deliveryDate = new Date()
+      deliveryDate.setDate(deliveryDate.getDate() + 3)
+      return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
+    }
 
-    // "即日"の場合はそのまま返す
+    // その他のカテゴリーは従来通りの計算
     if (leadTime === "即日") return "即日出荷"
-
-    // X週間の形式から数値を抽出
     const weeks = Number(leadTime.match(/\d+/)?.[0] || "0")
-
-    // 現在日付からX週間後の日付を計算
     const deliveryDate = addWeeks(new Date(), weeks)
-
-    // フォーマット: YYYY年MM月DD日（曜日）
     return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
   }
 
@@ -213,6 +307,16 @@ export default function CheckoutPage() {
     if (cartItems.length === 0) return "データなし"
 
     const deliveryDates = cartItems.map((item) => {
+      // カテゴリーに基づいた日付計算
+      if (item.item_category === "販促グッズ") {
+        return addWeeks(new Date(), 3) // 3週間後
+      } else if (item.item_category === "液剤") {
+        const date = new Date()
+        date.setDate(date.getDate() + 3) // 3日後
+        return date
+      }
+
+      // その他のカテゴリーは従来通りの計算
       if (item.lead_time === "即日") return new Date()
       const weeks = Number(item.lead_time.match(/\d+/)?.[0] || "0")
       return addWeeks(new Date(), weeks)
@@ -246,8 +350,10 @@ export default function CheckoutPage() {
   const hasApparelItems = cartItems.some((item) => isApparelItem(item.item_name))
   const shippingFee = hasApparelItems ? 1000 : 0
 
-  // 合計金額の計算
-  const totalAmount = subtotal + shippingFee
+  // 税金の計算（10%）
+  const tax = subtotal * 0.1
+  // 合計金額の計算（税込み + 送料）
+  const totalAmount = subtotal + tax + shippingFee
 
   // 注文の確定
   const handleSubmitOrder = async () => {
@@ -275,7 +381,7 @@ export default function CheckoutPage() {
           items: cartItems,
           storeInfo,
           shippingMethod,
-          totalAmount,
+          totalAmount, // 税込み + 送料の合計金額
         }),
       })
 
@@ -412,10 +518,14 @@ export default function CheckoutPage() {
                     <div key={item.id} className="flex gap-4 py-3 border-b last:border-0">
                       <div className="flex-shrink-0 w-16 h-16 relative">
                         <Image
-                          src={`/placeholder.svg?height=300&width=300&text=${encodeURIComponent(item.item_category)}%0A${encodeURIComponent(item.item_name)}`}
+                          src={getProductImage(item) || "/placeholder.svg"}
                           alt={item.item_name}
                           fill
-                          className="object-cover rounded"
+                          className="object-contain rounded"
+                          onError={(e) => {
+                            console.error(`Error loading image for ${item.item_name}, using fallback`)
+                            e.currentTarget.src = COMING_SOON_IMAGE_URL
+                          }}
                         />
                       </div>
                       <div className="flex-grow">
@@ -426,22 +536,10 @@ export default function CheckoutPage() {
                         <div className="text-sm text-muted-foreground space-y-1 mt-1">
                           {item.selectedColor && <p>カラー: {item.selectedColor}</p>}
                           {item.selectedSize && <p>サイズ: {item.selectedSize}</p>}
-
-                          {/* 特定のアイテムの場合は、selectedQuantityを「XX枚」として表示 */}
-                          {isSpecialItem(item.item_name) && item.selectedQuantity && <p>{item.selectedQuantity}枚</p>}
-
-                          {/* 特定のアイテム以外の販促グッズの場合 */}
-                          {!isSpecialItem(item.item_name) &&
-                            item.item_category === "販促グッズ" &&
-                            item.selectedQuantity && <p>{item.selectedQuantity}個</p>}
-
-                          {/* 特定のアイテム以外の場合のみ数量を表示 */}
-                          {!isSpecialItem(item.item_name) &&
-                            !(item.item_category === "販促グッズ" && item.selectedQuantity) && (
-                              <p>数量: {formatQuantity(item)}</p>
-                            )}
-
-                          <p className="text-green-600">納期: {calculateDeliveryDate(item.lead_time)}</p>
+                          <p>数量: {formatQuantity(item)}</p>
+                          <p className="text-green-600">
+                            納期: {calculateDeliveryDate(item.lead_time, item.item_category)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -464,12 +562,16 @@ export default function CheckoutPage() {
                     <span>¥{subtotal.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-gray-600">消費税 (10%)</span>
+                    <span>¥{tax.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-gray-600">配送料</span>
                     <span>¥{shippingFee.toLocaleString()}</span>
                   </div>
                   <Separator className="my-4" />
                   <div className="flex justify-between font-bold text-lg">
-                    <span>合計</span>
+                    <span>合計（税込）</span>
                     <span>¥{totalAmount.toLocaleString()}</span>
                   </div>
                 </div>

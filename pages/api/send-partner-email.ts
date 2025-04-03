@@ -35,7 +35,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       items: PartnerEmailItem[]
     }
 
+    console.log("Partner email request received:", {
+      to,
+      subject,
+      orderNumber,
+      storeName,
+      itemCount: items?.length || 0,
+    })
+
     if (!to || !subject || !orderNumber || !storeName || !items) {
+      console.error("Missing parameters:", { to, subject, orderNumber, storeName, hasItems: !!items })
       return res.status(400).json({ error: "必要なパラメータが不足しています" })
     }
 

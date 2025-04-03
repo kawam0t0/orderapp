@@ -82,7 +82,7 @@ function processAvailableItems(rows: any[][]) {
 
   // スプレッドシートの各行を処理
   rows.forEach((row) => {
-    const [id, category, name, color, size, amount, price, pricePerPiece, leadTime, partnerName] = row
+    const [id, category, name, color, size, amount, price, pricePerPiece, leadTime, partnerName, partnerEmail] = row
 
     // 商品名をキーとして使用
     const key = name
@@ -100,6 +100,7 @@ function processAvailableItems(rows: any[][]) {
         pricesPerPiece: {},
         leadTime: leadTime || "2週間",
         partnerName: partnerName || "",
+        partnerEmail: partnerEmail || "", // パートナーのメールアドレスを追加
       })
     }
 
@@ -133,7 +134,7 @@ function processAvailableItems(rows: any[][]) {
   // グループ化したデータを配列に変換
   return Array.from(groupedItems.values()).map((item) => {
     // 数量を昇順にソート
-    const sortedAmounts = Array.from(item.amounts as Set<number>).sort((a, b) => a - b)
+    const sortedAmounts = Array.from(item.amounts).sort((a, b) => a - b)
 
     // 対応する価格の配列を作成
     const sortedPrices = sortedAmounts.map((amount) => item.prices[amount] || "0")
@@ -152,6 +153,7 @@ function processAvailableItems(rows: any[][]) {
       pricesPerPiece: sortedPricesPerPiece,
       leadTime: item.leadTime,
       partnerName: item.partnerName,
+      partnerEmail: item.partnerEmail, // パートナーのメールアドレスを返す
     }
   })
 }

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/toast"
 
-// 商品タイプの定義を修正
+// 商品タイプの定義を更新
 type Product = {
   id: string
   category: string
@@ -26,6 +26,7 @@ type Product = {
   pricesPerPiece?: string[] // 1個あたりの価格
   leadTime: string
   partnerName?: string // パートナー名を追加
+  imageUrl?: string // 画像URLを追加
 }
 
 type CartItem = {
@@ -52,6 +53,18 @@ const hasSizeBasedPrice = (name: string): boolean => {
   return name.includes("Tシャツ") || name.includes("フーディ")
 }
 
+// 特定の販促グッズリストを定義
+const specialPromotionalItems = [
+  "ポイントカード",
+  "サブスクメンバーズカード",
+  "サブスクフライヤー",
+  "フリーチケット",
+  "クーポン券",
+  "名刺",
+  "のぼり",
+  "お年賀(マイクロファイバークロス)",
+]
+
 // サイズによって価格が変わる商品かどうかを判定する関数の後に、ハードコードされた価格情報を追加します
 // Tシャツのサイズごとの価格を定義（フォールバック用）
 const TSHIRT_PRICES: { [size: string]: number } = {
@@ -68,6 +81,30 @@ const HOODIE_PRICES: { [size: string]: number } = {
   XL: 3210,
   XXL: 3770,
   XXXL: 4000,
+}
+
+// COMING SOON画像のURL
+const COMING_SOON_IMAGE_URL =
+  "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/0005720_coming-soon-page_550-GJuRp7f7JXrp3ZSP6hK2ihMLTP2abk.webp"
+
+// Google DriveのURLを直接表示可能な形式に変換する関数
+const convertGoogleDriveUrl = (url: string): string => {
+  try {
+    // Google DriveのURLかどうかを確認
+    if (url && url.includes("drive.google.com/file/d/")) {
+      // ファイルIDを抽出
+      const fileIdMatch = url.match(/\/d\/([^/]+)/)
+      if (fileIdMatch && fileIdMatch[1]) {
+        const fileId = fileIdMatch[1]
+        // 直接表示可能なURLに変換
+        return `https://drive.google.com/uc?export=view&id=${fileId}`
+      }
+    }
+    return url
+  } catch (error) {
+    console.error("Error converting Google Drive URL:", error)
+    return url
+  }
 }
 
 export default function ProductsPage() {
@@ -96,11 +133,16 @@ export default function ProductsPage() {
         // デバッグ用：データ構造を確認
         console.log("Fetched products data:", data)
 
-        setProducts(data)
+        // 画像URLを変換
+        const productsWithConvertedUrls = data.map((product) => ({
+          ...product,
+          imageUrl: product.imageUrl ? convertGoogleDriveUrl(product.imageUrl) : "",
+        }))
+
+        setProducts(productsWithConvertedUrls)
 
         // カテゴリーの抽出
-        const uniqueCategories = Array.from(new Set(data.map((product: Product) => product.category))) as string[]
-
+        const uniqueCategories = [...new Set(data.map((product: Product) => product.category))]
         setCategories(uniqueCategories)
 
         // 初期選択状態を設定
@@ -188,8 +230,11 @@ export default function ProductsPage() {
     fetchProducts()
   }, [])
 
-  // カートに商品を追加する処理を修正
+  // カートに商品を追加する処理
   const addToCart = (product: Product) => {
+    // デバッグ用：パートナー名の確認
+    console.log(`Adding product to cart: ${product.name}, Partner: ${product.partnerName || "None"}`)
+
     let cartItem: CartItem | null = null
 
     // アパレル商品の場合
@@ -244,6 +289,9 @@ export default function ProductsPage() {
       // 対応する価格を取得
       const selectedPrice = product.prices && amountIndex !== -1 ? product.prices[amountIndex] : "0"
 
+      // 特定の販促グッズの場合は、selectedQuantity と quantity の両方に選択された数量を設定
+      const isSpecialPromotionalItem = specialPromotionalItems.some((name) => product.name.includes(name))
+
       cartItem = {
         id: product.id,
         item_category: product.category,
@@ -251,7 +299,7 @@ export default function ProductsPage() {
         item_price: selectedPrice,
         lead_time: product.leadTime,
         selectedQuantity: selectedAmount,
-        quantity: 1, // 販促グッズの場合は1セット（この値は表示用）
+        quantity: isSpecialPromotionalItem ? selectedAmount : 1, // 特定の販促グッズの場合は選択された数量、それ以外は1セット
         partnerName: product.partnerName, // パートナー名を追加
       }
     }
@@ -271,6 +319,9 @@ export default function ProductsPage() {
     }
 
     if (cartItem) {
+      // カート追加前の確認
+      console.log("Adding to cart:", cartItem)
+
       const updatedCart = [...cart, cartItem]
       setCart(updatedCart)
       localStorage.setItem("cart", JSON.stringify(updatedCart))
@@ -423,35 +474,57 @@ export default function ProductsPage() {
   }
 
   // 納期の計算
-  const calculateDeliveryDate = (leadTime: string) => {
-    // "即日"の場合はそのまま返す
+  const calculateDeliveryDate = (leadTime: string, category: string) => {
+    // カテゴリーに基づいた納期計算
+    if (category === "販促グッズ") {
+      // 販促グッズは約3週間
+      const deliveryDate = addWeeks(new Date(), 3)
+      return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
+    } else if (category === "液剤") {
+      // 液剤は約3日
+      const deliveryDate = new Date()
+      deliveryDate.setDate(deliveryDate.getDate() + 3)
+      return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
+    }
+
+    // その他のカテゴリーは従来通りの計算
     if (leadTime === "即日") return "即日出荷"
-
-    // X週間の形式から数値を抽出
     const weeks = Number(leadTime.match(/\d+/)?.[0] || "0")
-
-    // 現在日付からX週間後の日付を計算
     const deliveryDate = addWeeks(new Date(), weeks)
-
-    // フォーマット: YYYY年MM月DD日（曜日）
     return `${format(deliveryDate, "yyyy年MM月dd日", { locale: ja })}頃`
   }
 
-  // 商品画像の取得
-  const getProductImage = (category: string, name: string) => {
-    // カテゴリーに基づいたプレースホルダー画像を返す
-    switch (category) {
-      case "アパレル":
-        return `/placeholder.svg?height=300&width=300&text=👕%20${encodeURIComponent(name)}`
-      case "販促グッズ":
-        return `/placeholder.svg?height=300&width=300&text=🎁%20${encodeURIComponent(name)}`
-      case "液剤":
-        return `/placeholder.svg?height=300&width=300&text=💧%20${encodeURIComponent(name)}`
-      case "クロス":
-        return `/placeholder.svg?height=300&width=300&text=🧹%20${encodeURIComponent(name)}`
-      default:
-        return `/placeholder.svg?height=300&width=300&text=${encodeURIComponent(category)}%0A${encodeURIComponent(name)}`
+  // 商品画像の取得関数
+  const getProductImage = (product: Product) => {
+    // 画像URLが存在し、有効な場合はそれを使用
+    if (product.imageUrl && product.imageUrl.trim() !== "") {
+      // デバッグ用：画像URLを確認
+      console.log(`Using image URL for ${product.name}: ${product.imageUrl}`)
+
+      // 画像の読み込みエラーを処理するためのフォールバック
+      return product.imageUrl
     }
+
+    // 画像URLがない場合はCOMING SOON画像を使用
+    console.log(`Using COMING SOON image for ${product.name}`)
+    return COMING_SOON_IMAGE_URL
+  }
+
+  // 数量選択のプルダウンを生成する関数
+  const generateQuantityOptions = (product) => {
+    // 特定の販促グッズの場合は、選択された数量をそのまま使用
+    if (specialPromotionalItems.some((item) => product.name.includes(item))) {
+      return product.amounts.map((amount) => ({
+        value: amount.toString(),
+        label: `${amount}枚`,
+      }))
+    }
+
+    // その他の商品は従来通りの処理
+    return product.amounts.map((amount, index) => ({
+      value: amount.toString(),
+      label: `${amount}${product.name.includes("液剤") ? "本" : "枚"} (${product.prices[index]})`,
+    }))
   }
 
   // カテゴリーの順序を定義
@@ -557,12 +630,19 @@ export default function ProductsPage() {
               key={product.id}
               className="overflow-hidden flex flex-col h-full hover:shadow-lg transition-shadow border border-gray-200 rounded-xl"
             >
-              <div className="relative pt-[100%] bg-gray-50">
+              {/* 水色の枠内に画像を表示 */}
+              <div className="relative pt-[100%] bg-gray-50 border-2 border-cyan-300">
                 <Image
-                  src={getProductImage(product.category, product.name) || "/placeholder.svg"}
+                  src={getProductImage(product) || "/placeholder.svg"}
                   alt={product.name}
                   fill
                   className="object-contain p-4"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  onError={(e) => {
+                    // 画像の読み込みエラー時にCOMING SOON画像を表示
+                    console.error(`Error loading image for ${product.name}, using fallback`)
+                    e.currentTarget.src = COMING_SOON_IMAGE_URL
+                  }}
                 />
                 <Badge className="absolute top-2 left-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full">
                   {product.category}
@@ -572,9 +652,10 @@ export default function ProductsPage() {
               <CardContent className="flex-grow p-4">
                 <h3 className="font-semibold text-lg mb-3 line-clamp-2">{product.name}</h3>
 
+                {/* 商品カードの納期表示部分を修正 */}
                 <p className="text-sm text-green-600 mb-4 flex items-center">
                   <span className="inline-block w-2 h-2 rounded-full bg-green-600 mr-2"></span>
-                  納期: {calculateDeliveryDate(product.leadTime)}
+                  納期: {calculateDeliveryDate(product.leadTime, product.category)}
                 </p>
 
                 {/* アパレル商品の場合 */}
@@ -654,7 +735,10 @@ export default function ProductsPage() {
                       <SelectContent>
                         {product.amounts.map((amount) => (
                           <SelectItem key={`${product.id}-amount-${amount}`} value={String(amount)}>
-                            {amount}個
+                            {/* 特定の販促グッズの場合は単位を「枚」に固定 */}
+                            {specialPromotionalItems.some((item) => product.name.includes(item))
+                              ? `${amount}枚`
+                              : `${amount}個`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -688,6 +772,14 @@ export default function ProductsPage() {
                   {/* Tシャツとフーディの場合、サイズによって価格が変わることを表示 */}
                   {hasSizeBasedPrice(product.name) && (
                     <p className="text-xs text-gray-500">※サイズによって価格が変わります</p>
+                  )}
+                  {/* 販促グッズの場合、1個あたりの価格を表示 */}
+                  {product.category === "販促グッズ" && product.amounts && product.amounts.length > 0 && (
+                    <>
+                      {calculatePricePerPiece(product) && (
+                        <p className="text-xs text-gray-500">¥{calculatePricePerPiece(product)}/個</p>
+                      )}
+                    </>
                   )}
                 </div>
               </CardContent>
