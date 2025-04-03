@@ -1,6 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next"
 import nodemailer from "nodemailer"
 
+// 商品アイテムの型定義
+type ShippingItem = {
+  name: string
+  size?: string
+  color?: string
+  quantity: number
+}
+
 // メール送信用のトランスポーターを設定
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -19,7 +27,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { to, orderNumber, storeName, shippingDate, items } = req.body
+    const { to, orderNumber, storeName, shippingDate, items } = req.body as {
+      to: string
+      orderNumber: string
+      storeName: string
+      shippingDate: string
+      items: ShippingItem[]
+    }
 
     if (!to || !orderNumber || !storeName || !shippingDate) {
       return res.status(400).json({ error: "必要なパラメータが不足しています" })
@@ -50,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             <tbody>
               ${items
                 .map(
-                  (item) => `
+                  (item: ShippingItem) => `
                 <tr>
                   <td style="padding: 8px; border: 1px solid #e0f2fe;">${item.name}</td>
                   <td style="padding: 8px; text-align: center; border: 1px solid #e0f2fe;">${item.size || "-"}</td>
