@@ -127,7 +127,7 @@ export default function CartPage() {
             const items = JSON.parse(savedCart)
             const updatedItems = items.map((item: CartItem) => {
               // 商品名で一致する商品を検索
-              const matchingProduct = data.find((product) => product.name === item.item_name)
+              const matchingProduct = data.find((product: any) => product.name === item.item_name)
               if (matchingProduct && matchingProduct.imageUrl) {
                 return {
                   ...item,
