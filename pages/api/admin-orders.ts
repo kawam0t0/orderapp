@@ -1,6 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next"
 import { google } from "googleapis"
 
+// Define the OrderItem type
+type OrderItem = {
+  name: string
+  size: string
+  color: string
+  quantity: string
+}
+
 async function getAuthToken() {
   // 環境変数チェックを追加し、エラーメッセージを改善
   if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
@@ -61,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 発注データを整形
     const allOrders = response.data.values.map((row, index) => {
       // 商品情報を抽出
-      const items = []
+      const items: OrderItem[] = [] // 明示的に型を指定
       for (let i = 5; i < Math.min(row.length, 33); i += 4) {
         // 商品情報は33列目まで
         if (row[i]) {
