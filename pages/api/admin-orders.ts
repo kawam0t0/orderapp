@@ -44,7 +44,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 発注データを整形
     const allOrders = response.data.values.map((row, index) => {
       // 商品情報を抽出
-      const items = []
+      type OrderItem = {
+        name: string;
+        size: string;
+        color: string;
+        quantity: string;
+      }
+      
+      // 型を明示的に指定して配列を初期化
+      const items: OrderItem[] = []
       for (let i = 5; i < Math.min(row.length, 33); i += 4) {
         // 商品情報は33列目まで
         if (row[i]) {
