@@ -142,7 +142,7 @@ export default function ProductsPage() {
         setProducts(productsWithConvertedUrls)
 
         // カテゴリーの抽出
-        const uniqueCategories = [...new Set(data.map((product: Product) => product.category))]
+        const uniqueCategories = [...new Set(data.map((product: Product) => product.category))] as string[]
         setCategories(uniqueCategories)
 
         // 初期選択状態を設定
