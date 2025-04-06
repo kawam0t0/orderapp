@@ -1,6 +1,22 @@
 import { google } from "googleapis"
 import type { NextApiRequest, NextApiResponse } from "next"
 
+// 修正箇所1: 型定義を追加
+// 関数の前に以下の型定義を追加
+type GroupedItem = {
+  id: string
+  category: string
+  name: string
+  colors: Set<string>
+  sizes: Set<string>
+  amounts: Set<number> // 数値型のSetとして定義
+  prices: { [key: number]: string }
+  pricesPerPiece: { [key: number]: string }
+  leadTime: string
+  partnerName: string
+  partnerEmail: string
+}
+
 async function getAuthToken() {
   if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     throw new Error("GOOGLE_APPLICATION_CREDENTIALS is not set")
@@ -78,7 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
 // 商品データ処理を別関数に分離して最適化
 function processAvailableItems(rows: any[][]) {
-  const groupedItems = new Map()
+  const groupedItems = new Map<string, GroupedItem>()
 
   // スプレッドシートの各行を処理
   rows.forEach((row) => {
@@ -134,7 +150,7 @@ function processAvailableItems(rows: any[][]) {
   // グループ化したデータを配列に変換
   return Array.from(groupedItems.values()).map((item) => {
     // 数量を昇順にソート
-    const sortedAmounts = Array.from(item.amounts).sort((a, b) => a - b)
+    const sortedAmounts = Array.from(item.amounts as Set<number>).sort((a, b) => a - b)
 
     // 対応する価格の配列を作成
     const sortedPrices = sortedAmounts.map((amount) => item.prices[amount] || "0")
