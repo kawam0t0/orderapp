@@ -109,9 +109,9 @@ function processAvailableItems(rows: any[][]) {
         id: id || Math.random().toString(36).substring(2, 9),
         category: category || "",
         name: name || "",
-        colors: new Set(),
-        sizes: new Set(),
-        amounts: new Set(),
+        colors: new Set<string>(),
+        sizes: new Set<string>(),
+        amounts: new Set<number>(),
         prices: {},
         pricesPerPiece: {},
         leadTime: leadTime || "2週間",
@@ -120,7 +120,8 @@ function processAvailableItems(rows: any[][]) {
       })
     }
 
-    const item = groupedItems.get(key)
+    // 修正箇所2: 必ず存在することを保証
+    const item = groupedItems.get(key)! // 非nullアサーション演算子を使用
 
     // カラーとサイズを追加（存在する場合）
     if (color) item.colors.add(color)
@@ -150,7 +151,7 @@ function processAvailableItems(rows: any[][]) {
   // グループ化したデータを配列に変換
   return Array.from(groupedItems.values()).map((item) => {
     // 数量を昇順にソート
-    const sortedAmounts = Array.from(item.amounts as Set<number>).sort((a, b) => a - b)
+    const sortedAmounts = Array.from(item.amounts).sort((a, b) => a - b)
 
     // 対応する価格の配列を作成
     const sortedPrices = sortedAmounts.map((amount) => item.prices[amount] || "0")
@@ -193,6 +194,14 @@ const isSpecialItem = (itemName: string): boolean => {
 
 // 注文履歴データを処理する関数
 function processOrderHistory(rows: any[][]) {
+  // 修正箇所3: 明示的な型定義を追加
+  type OrderItem = {
+    name: string
+    size: string
+    color: string
+    quantity: string
+  }
+
   return rows.map((row, index) => {
     // 基本情報を抽出
     const orderNumber = row[0] || `ORD-${(index + 1).toString().padStart(5, "0")}`
@@ -202,7 +211,7 @@ function processOrderHistory(rows: any[][]) {
     const email = row[4] || ""
 
     // 商品情報を抽出
-    const items = []
+    const items: OrderItem[] = []
     for (let i = 5; i < Math.min(row.length, 33); i += 4) {
       // 商品名が存在する場合のみ追加
       if (row[i]) {
