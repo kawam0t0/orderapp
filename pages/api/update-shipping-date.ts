@@ -2,14 +2,31 @@ import type { NextApiRequest, NextApiResponse } from "next"
 import { google } from "googleapis"
 
 async function getAuthToken() {
-  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    throw new Error("GOOGLE_APPLICATION_CREDENTIALS is not set")
+  // 環境変数チェックを追加し、エラーメッセージを改善
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+    console.warn("Google認証情報が設定されていません。")
+    throw new Error("Google認証情報が設定されていません。")
   }
 
-  return new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  })
+  try {
+    // GOOGLE_APPLICATION_CREDENTIALS_JSONが設定されている場合、それを使用
+    if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+      const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON)
+      return new google.auth.GoogleAuth({
+        credentials,
+        scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+      })
+    }
+
+    // 従来の方法（ファイルパス）
+    return new google.auth.GoogleAuth({
+      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    })
+  } catch (error) {
+    console.error("Auth error:", error)
+    throw error
+  }
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
