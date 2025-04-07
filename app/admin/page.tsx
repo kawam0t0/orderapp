@@ -2,7 +2,17 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronDown, ChevronLeft, ChevronRight, LogOut, Search, Filter, RefreshCw, Package } from "lucide-react"
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  LogOut,
+  Search,
+  Filter,
+  RefreshCw,
+  Package,
+} from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,6 +27,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { format, parseISO, isValid } from "date-fns"
 import { ja } from "date-fns/locale"
+import { CategoryTabs } from "./category-tabs"
 import { CategoryOrders } from "./category-orders"
 
 // 注文アイテムの型定義
@@ -89,9 +100,6 @@ const getStatusColor = (status: string) => {
   }
 }
 
-// 液剤アイテムのリスト
-const liquidItems = ["スプシャン", "スプワックス", "スプコート", "セラミック", "マイクロファイバー"]
-
 export default function AdminPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
@@ -103,6 +111,8 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
   const [selectedDates, setSelectedDates] = useState<{ [key: string]: Date | undefined }>({})
+  const [activeCategory, setActiveCategory] = useState<string>("販促グッズ") // デフォルトを販促グッズに変更
+  const categories = ["販促グッズ", "液剤"] // カテゴリーを2つに制限
   const [availableItems, setAvailableItems] = useState<AvailableItem[]>([]) // 商品データを保持するstate
 
   // 商品データを取得する関数
@@ -147,26 +157,7 @@ export default function AdminPage() {
           return order
         })
 
-        // 日付と時間を正確に解析してソート（降順）
-        const sortedOrders = [...ordersWithDates].sort((a, b) => {
-          // 日付と時間を解析
-          const parseDateTime = (dateStr: string, timeStr: string) => {
-            try {
-              const [year, month, day] = dateStr.split("/").map(Number)
-              const [hour, minute] = timeStr.split(":").map(Number)
-              return new Date(year, month - 1, day, hour, minute).getTime()
-            } catch (e) {
-              return 0
-            }
-          }
-
-          const dateTimeA = parseDateTime(a.orderDate, a.orderTime)
-          const dateTimeB = parseDateTime(b.orderDate, b.orderTime)
-
-          return dateTimeB - dateTimeA // 降順（最新が先頭）
-        })
-
-        setOrders(sortedOrders)
+        setOrders(ordersWithDates)
         setTotalPages(data.totalPages)
         setTotalOrders(data.total)
         setCurrentPage(data.page)
@@ -186,22 +177,17 @@ export default function AdminPage() {
     fetchOrders()
   }, [])
 
-  // 販促グッズのアイテムのみをフィルタリングする関数
-  const getPromotionalItems = (order: Order): OrderItem[] => {
+  // カテゴリーに基づいて商品をフィルタリングする関数
+  const getCategoryItems = (order: Order, category: string): OrderItem[] => {
     return order.items.filter((item) => {
-      // 液剤アイテムを除外
-      if (liquidItems.some((liquidItem) => item.name.includes(liquidItem))) {
-        return false
-      }
-
       // 商品名を取得
       const itemName = item.name
 
       // Available_itemsシートから該当する商品を検索
       const matchingItem = availableItems.find((avItem) => itemName.includes(avItem.name))
 
-      // 該当する商品が見つかり、そのカテゴリーが「販促グッズ」と一致する場合
-      if (matchingItem && matchingItem.category === "販促グッズ") {
+      // 該当する商品が見つかり、そのカテゴリーが指定されたカテゴリーと一致する場合
+      if (matchingItem && matchingItem.category === category) {
         return true
       }
 
@@ -248,6 +234,7 @@ export default function AdminPage() {
     }
   }
 
+  // 出荷日の更新処理を修正
   // 出荷日の更新処理を修正
   const handleShippingDateChange = async (orderNumber: string, date: Date | undefined) => {
     try {
@@ -331,7 +318,13 @@ export default function AdminPage() {
         // ステータスが「処理中」から「出荷済み」に変わった場合のみ通知メールを送信
         if (isStatusChanging && currentOrder) {
           try {
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+            // baseUrlの取得方法を修正
+            const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
+              ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+              : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+
+            console.log("Using base URL for shipping notification:", baseUrl)
+
             await fetch(`${baseUrl}/api/send-shipping-notification`, {
               method: "POST",
               headers: {
@@ -380,16 +373,8 @@ export default function AdminPage() {
     }
   }
 
-  // 販促グッズのアイテムを含む注文のみをフィルタリング
-  const ordersWithPromotionalItems = orders.filter((order) => {
-    const promotionalItems = getPromotionalItems(order)
-    return promotionalItems.length > 0
-  })
-
   // フィルタリングされた注文リスト
-  const filteredOrders = statusFilter
-    ? ordersWithPromotionalItems.filter((order) => order.status === statusFilter)
-    : ordersWithPromotionalItems
+  const filteredOrders = statusFilter ? orders.filter((order) => order.status === statusFilter) : orders
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
@@ -480,6 +465,10 @@ export default function AdminPage() {
                   <RefreshCw className="mr-2 h-4 w-4" />
                   更新
                 </Button>
+                <Button variant="outline" className="flex items-center bg-white hover:bg-gray-50">
+                  <Download className="mr-2 h-4 w-4" />
+                  CSVエクスポート
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -498,28 +487,28 @@ export default function AdminPage() {
             </div>
           ) : (
             <>
-              {/* 販促グッズのみ表示 */}
-              <div className="py-3 px-6 border-b border-gray-200 bg-blue-50">
-                <h3 className="text-blue-800 font-medium">販促グッズ</h3>
-              </div>
+              <CategoryTabs
+                categories={categories}
+                activeCategory={activeCategory}
+                onCategoryChange={setActiveCategory}
+              />
 
-              {/* 注文表示 */}
+              {/* カテゴリー別表示 */}
               <CategoryOrders
                 orders={filteredOrders}
-                category="販促グッズ"
+                category={activeCategory}
                 onDateSelect={handleShippingDateChange}
                 formatDateTime={formatDateTime}
                 getStatusColor={getStatusColor}
                 selectedDates={selectedDates}
                 availableItems={availableItems}
-                getPromotionalItems={getPromotionalItems}
               />
 
               {/* ページネーション */}
               <div className="flex items-center justify-between px-6 py-5 border-t border-gray-100">
                 <div className="text-sm text-gray-500">
-                  全 {filteredOrders.length} 件中 {(currentPage - 1) * 30 + 1} -{" "}
-                  {Math.min(currentPage * 30, filteredOrders.length)} 件を表示
+                  全 {totalOrders} 件中 {(currentPage - 1) * 30 + 1} - {Math.min(currentPage * 30, totalOrders)}{" "}
+                  件を表示
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button
