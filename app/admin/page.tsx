@@ -317,11 +317,20 @@ export default function AdminPage() {
 
         // ステータスが「処理中」から「出荷済み」に変わった場合のみ通知メールを送信
         if (isStatusChanging && currentOrder) {
+          // 出荷通知メールを送信
           try {
             // baseUrlの取得方法を修正
-            const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-              ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-              : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+            let baseUrl = ""
+            if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+              // Vercel環境の場合はhttpsスキーマを追加
+              baseUrl = `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+            } else if (process.env.NEXT_PUBLIC_BASE_URL) {
+              // 明示的に設定されたベースURLがある場合はそれを使用
+              baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+            } else {
+              // ローカル開発環境のフォールバック
+              baseUrl = "http://localhost:3000"
+            }
 
             console.log("Using base URL for shipping notification:", baseUrl)
 

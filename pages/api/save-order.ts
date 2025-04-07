@@ -252,10 +252,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 発注確認メールを送信
     try {
       console.log("Preparing to send email to:", storeInfo.email)
+
       // baseUrlの取得方法を修正
-      const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-        : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+      let baseUrl = ""
+      if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+        // Vercel環境の場合はhttpsスキーマを追加
+        baseUrl = `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      } else if (process.env.NEXT_PUBLIC_BASE_URL) {
+        // 明示的に設定されたベースURLがある場合はそれを使用
+        baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      } else {
+        // ローカル開発環境のフォールバック
+        baseUrl = "http://localhost:3000"
+      }
 
       console.log("Using base URL for API calls:", baseUrl)
 
@@ -355,14 +364,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return
     }
 
-    // 各パートナーにメールを送信（非同期処理を並列化）
+    // パートナーメールの送信
     const partnerEmailPromises = Object.values(partnerGroups).map(async (partnerInfo) => {
       try {
         console.log(`Sending email to partner: ${partnerInfo.name} (${partnerInfo.email})`)
+
         // baseUrlの取得方法を修正
-        const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-          ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-          : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+        let baseUrl = ""
+        if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+          // Vercel環境の場合はhttpsスキーマを追加
+          baseUrl = `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+        } else if (process.env.NEXT_PUBLIC_BASE_URL) {
+          // 明示的に設定されたベースURLがある場合はそれを使用
+          baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+        } else {
+          // ローカル開発環境のフォールバック
+          baseUrl = "http://localhost:3000"
+        }
 
         console.log("Using base URL for partner email:", baseUrl)
 
@@ -381,7 +399,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const responseText = await partnerEmailResponse.text()
         if (!partnerEmailResponse.ok) {
-          console.error(`${partnerInfo.name}へのメール送信に失敗しました:`, responseText)
+          console.error(`${partnerInfo.name}へのメ���ル送信に失敗しました:`, responseText)
         } else {
           console.log(`${partnerInfo.name}へのメール送信成功:`, responseText)
         }
