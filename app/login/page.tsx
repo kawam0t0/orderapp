@@ -130,7 +130,7 @@ export default function LoginPage() {
     <div
       className="min-h-screen flex items-center justify-center p-4 relative"
       style={{
-        backgroundImage: `url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-RNulptIJx0tUJFlgPmlYgkGgzPOljF.png')`,
+        backgroundImage: `url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/%E3%83%AD%E3%82%B3%E3%82%99-6PmM1INcDPXGveCta0ZxgG7TLPF9gO.png')`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
@@ -140,9 +140,11 @@ export default function LoginPage() {
       <div className="absolute inset-0 bg-white/80"></div>
       <div className="relative z-10 w-full max-w-md">
         <Card className="w-full shadow-lg border-blue-100">
-          <CardHeader className="space-y-1 text-center bg-blue-600 text-white rounded-t-lg">
-            <CardTitle className="text-3xl font-bold tracking-tight">SPLASH'N'GO!</CardTitle>
-            <CardDescription className="text-blue-100 text-lg">備品発注システム</CardDescription>
+          <CardHeader className="space-y-1 text-center bg-blue-600 text-white rounded-t-lg p-0">
+            <div className="py-4">
+              <CardTitle className="text-3xl font-bold tracking-tight">SPLASH'N'GO!</CardTitle>
+              <CardDescription className="text-blue-100 text-lg">備品発注システム</CardDescription>
+            </div>
           </CardHeader>
 
           <CardContent className="space-y-6 pt-6">
