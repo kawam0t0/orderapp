@@ -1,16 +1,12 @@
 "use client"
-
-import { useState } from "react"
-import { format } from "date-fns"
-import { ja } from "date-fns/locale"
-import { CalendarIcon } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { ja } from "date-fns/locale"
+import { CalendarIcon } from "lucide-react"
 
-// 型定義
+// 注文アイテムの型定義
 type OrderItem = {
   name: string
   size: string
@@ -18,6 +14,7 @@ type OrderItem = {
   quantity: string
 }
 
+// 注文の型定義
 type Order = {
   id: number
   orderNumber: string
@@ -30,6 +27,7 @@ type Order = {
   shippingDate?: string | null
 }
 
+// 商品情報の型定義
 type AvailableItem = {
   id: string
   category: string
@@ -43,7 +41,7 @@ type AvailableItem = {
   partnerName?: string
 }
 
-type CategoryOrdersProps = {
+interface CategoryOrdersProps {
   orders: Order[]
   category: string
   onDateSelect: (orderNumber: string, date: Date | undefined) => void
@@ -51,24 +49,6 @@ type CategoryOrdersProps = {
   getStatusColor: (status: string) => string
   selectedDates: { [key: string]: Date | undefined }
   availableItems: AvailableItem[]
-  getPromotionalItems: (order: Order) => OrderItem[]
-}
-
-// 特定の販促グッズリストを定義
-const specialPromotionalItems = [
-  "ポイントカード",
-  "サブスクメンバーズカード",
-  "サブスクフライヤー",
-  "フリーチケット",
-  "クーポン券",
-  "名刺",
-  "のぼり",
-  "お年賀(マイクロファイバークロス)",
-]
-
-// 特定のアイテムかどうかを判定する関数
-const isSpecialItem = (itemName: string): boolean => {
-  return specialPromotionalItems.some((name) => itemName.includes(name))
 }
 
 export function CategoryOrders({
@@ -79,146 +59,121 @@ export function CategoryOrders({
   getStatusColor,
   selectedDates,
   availableItems,
-  getPromotionalItems,
 }: CategoryOrdersProps) {
-  const [expandedOrders, setExpandedOrders] = useState<{ [key: string]: boolean }>({})
+  // カテゴリーに基づいて商品をフィルタリングする関数
+  const getCategoryItems = (order: Order, category: string): OrderItem[] => {
+    return order.items.filter((item) => {
+      // 商品名を取得
+      const itemName = item.name
 
-  // 注文の展開/折りたたみを切り替える
-  const toggleOrderExpand = (orderNumber: string) => {
-    setExpandedOrders((prev) => ({
-      ...prev,
-      [orderNumber]: !prev[orderNumber],
-    }))
-  }
+      // Available_itemsシートから該当する商品を検索
+      const matchingItem = availableItems.find((avItem) => itemName.includes(avItem.name))
 
-  // 数量の表示方法を修正する関数
-  const formatQuantity = (item: OrderItem) => {
-    // 特定のアイテムの場合は、数量を「XX枚」として表示
-    if (isSpecialItem(item.name)) {
-      return `${item.quantity}枚`
-    }
-
-    // その他の商品は数量をそのまま表示
-    return item.quantity
-  }
-
-  // 日付でソートされた注文を取得
-  const sortedOrders = [...orders].sort((a, b) => {
-    // 日付と時間を解析
-    const parseDateTime = (dateStr: string, timeStr: string) => {
-      try {
-        const [year, month, day] = dateStr.split("/").map(Number)
-        const [hour, minute] = timeStr.split(":").map(Number)
-        return new Date(year, month - 1, day, hour, minute).getTime()
-      } catch (e) {
-        return 0
+      // 該当する商品が見つかり、そのカテゴリーが指定されたカテゴリーと一致する場合
+      if (matchingItem && matchingItem.category === category) {
+        return true
       }
-    }
 
-    const dateTimeA = parseDateTime(a.orderDate, a.orderTime)
-    const dateTimeB = parseDateTime(b.orderDate, b.orderTime)
-
-    return dateTimeB - dateTimeA // 降順（最新が先頭）
-  })
-
-  // 日付をフォーマットする関数（undefinedのチェックを追加）
-  const formatDate = (date: Date | undefined): string => {
-    if (!date) return "出荷日を選択"
-    return format(date, "yyyy年MM月dd日", { locale: ja })
+      return false
+    })
   }
 
   return (
     <div className="divide-y divide-gray-100">
-      {sortedOrders.map((order) => {
-        // 販促グッズのアイテムをフィルタリング
-        const promotionalItems = getPromotionalItems(order)
+      {orders.map((order) => {
+        // 選択されたカテゴリーに属する商品のみをフィルタリング
+        const categoryItems = getCategoryItems(order, category)
 
-        // 販促グッズのアイテムがない場合はスキップ
-        if (promotionalItems.length === 0) return null
-
-        const isExpanded = expandedOrders[order.orderNumber] || false
-        const selectedDate = selectedDates[order.orderNumber]
+        // 該当する商品がない場合は表示しない
+        if (categoryItems.length === 0) return null
 
         return (
-          <div key={order.orderNumber} className="py-4 px-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+          <div key={order.orderNumber} className="p-6 hover:bg-gray-50">
+            <div className="flex flex-col md:flex-row justify-between mb-4">
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium text-gray-900">{order.storeName}</h3>
-                  <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
-                </div>
-                <p className="text-sm text-gray-500">
-                  発注番号: {order.orderNumber} | 発注日時: {formatDateTime(order.orderDate, order.orderTime)}
-                </p>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <span className="mr-2">発注番号: {order.orderNumber}</span>
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${getStatusColor(order.status)}`}>
+                    {order.status}
+                  </span>
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">{formatDateTime(order.orderDate, order.orderTime)}</p>
+                <p className="text-sm font-medium text-gray-700 mt-1">店舗名: {order.storeName}</p>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="mt-4 md:mt-0 flex items-center">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className={cn("justify-start text-left font-normal bg-white", !selectedDate && "text-gray-500")}
+                      className={`flex items-center h-9 px-3 ${
+                        selectedDates[order.orderNumber] ? "border-blue-500 text-blue-600" : ""
+                      }`}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formatDate(selectedDate)}
+                      {selectedDates[order.orderNumber]
+                        ? format(selectedDates[order.orderNumber]!, "yyyy年MM月dd日", { locale: ja })
+                        : "出荷日を設定"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="end">
                     <Calendar
                       mode="single"
-                      selected={selectedDate}
+                      selected={selectedDates[order.orderNumber]}
                       onSelect={(date) => onDateSelect(order.orderNumber, date)}
                       initialFocus
                     />
                   </PopoverContent>
                 </Popover>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleOrderExpand(order.orderNumber)}
-                  className="text-blue-600"
-                >
-                  {isExpanded ? "折りたたむ" : "詳細を表示"}
-                </Button>
               </div>
             </div>
 
-            {isExpanded && (
-              <div className="mt-4 bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-700 mb-2">注文商品一覧</h4>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          商品名
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          サイズ
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          カラー
-                        </th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          数量
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {promotionalItems.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{item.name}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.size || "-"}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{item.color || "-"}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{formatQuantity(item)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      商品名
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      サイズ
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      カラー
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+                    >
+                      数量
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {categoryItems.map((item, index) => (
+                    <tr key={`${order.orderNumber}-${index}`} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">{item.name}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-center text-gray-500">
+                        {item.size || "-"}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-center text-gray-500">
+                        {item.color || "-"}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-center text-gray-500">{item.quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )
       })}
