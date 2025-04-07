@@ -4,14 +4,12 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Info, Store, User, Lock } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Info, User, Lock, Store, Eye, EyeOff } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // 静的ページ生成を無効化し、動的レンダリングを強制
@@ -27,14 +25,13 @@ type StoreInfo = {
 
 export default function LoginPage() {
   const router = useRouter()
-  const [storeId, setStoreId] = useState("")
+  const [selectedStore, setSelectedStore] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [selectedStore, setSelectedStore] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [stores, setStores] = useState<StoreInfo[]>([])
-  const [activeTab, setActiveTab] = useState("store")
+  const [showPassword, setShowPassword] = useState(false)
 
   // 店舗情報を取得
   useEffect(() => {
@@ -67,48 +64,25 @@ export default function LoginPage() {
     fetchStores()
   }, [])
 
-  // 店舗IDでのログイン処理
-  const handleStoreIdLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  // 店舗選択時の処理
+  const handleStoreChange = (storeId: string) => {
+    setSelectedStore(storeId)
 
-    if (!storeId.trim()) {
-      setError("店舗IDを入力してください")
-      return
-    }
-
-    setLoading(true)
-    setError("")
-
-    try {
-      // 店舗IDが一致するデータを検索
-      const storeData = stores.find((store) => store.id === storeId)
-
-      if (storeData) {
-        // 店舗情報をローカルストレージに保存
-        const storeInfo = {
-          id: storeData.id,
-          name: storeData.name,
-          email: storeData.email,
-        }
-
-        localStorage.setItem("storeInfo", JSON.stringify(storeInfo))
-
-        // 商品一覧ページにリダイレクト
-        router.push("/products")
-      } else {
-        setError("入力された店舗IDは登録されていません")
-      }
-    } catch (err) {
-      console.error("Login error:", err)
-      setError("ログイン処理中にエラーが発生しました")
-    } finally {
-      setLoading(false)
+    // 選択された店舗のメールアドレスを自動入力
+    const selectedStoreData = stores.find((store) => store.id === storeId)
+    if (selectedStoreData && selectedStoreData.email) {
+      setEmail(selectedStoreData.email)
     }
   }
 
-  // メール・パスワードでのログイン処理
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  // ログイン処理
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!selectedStore) {
+      setError("店舗を選択してください")
+      return
+    }
 
     if (!email.trim() || !password.trim()) {
       setError("メールアドレスとパスワードを入力してください")
@@ -119,8 +93,10 @@ export default function LoginPage() {
     setError("")
 
     try {
-      // メールとパスワードが一致するデータを検索
-      const storeData = stores.find((store) => store.email === email && store.password === password)
+      // 選択された店舗とメール・パスワードが一致するか確認
+      const storeData = stores.find(
+        (store) => store.id === selectedStore && store.email === email && store.password === password,
+      )
 
       if (storeData) {
         // 店舗情報をローカルストレージに保存
@@ -145,191 +121,100 @@ export default function LoginPage() {
     }
   }
 
-  // 店舗名選択でのログイン処理
-  const handleStoreNameLogin = async () => {
-    if (!selectedStore) {
-      setError("店舗を選択してください")
-      return
-    }
-
-    setLoading(true)
-    setError("")
-
-    try {
-      // 選択された店舗IDに一致するデータを検索
-      const storeData = stores.find((store) => store.id === selectedStore)
-
-      if (storeData) {
-        // 店舗情報をローカルストレージに保存
-        const storeInfo = {
-          id: storeData.id,
-          name: storeData.name,
-          email: storeData.email,
-        }
-
-        localStorage.setItem("storeInfo", JSON.stringify(storeInfo))
-
-        // 商品一覧ページにリダイレクト
-        router.push("/products")
-      } else {
-        setError("選択された店舗情報が見つかりません")
-      }
-    } catch (err) {
-      console.error("Login error:", err)
-      setError("ログイン処理中にエラーが発生しました")
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // 管理者ログイン処理
   const handleAdminLogin = () => {
     router.push("/admin")
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-100 to-white p-4">
       <Card className="w-full max-w-md shadow-lg border-blue-100">
-        <CardHeader className="space-y-1 text-center">
-          <div className="flex justify-center mb-4">
-            <Image
-              src="/placeholder.svg?height=80&width=240"
-              alt="SPLASH'N'GO! Logo"
-              width={240}
-              height={80}
-              className="rounded"
-              priority
-            />
-          </div>
-          <CardTitle className="text-2xl font-bold text-blue-800">SPLASH'N'GO!</CardTitle>
-          <CardDescription className="text-blue-600">備品発注システム</CardDescription>
+        <CardHeader className="space-y-1 text-center bg-blue-600 text-white rounded-t-lg">
+          <CardTitle className="text-3xl font-bold tracking-tight">SPLASH'N'GO!</CardTitle>
+          <CardDescription className="text-blue-100 text-lg">備品発注システム</CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-4">
-          <Tabs defaultValue="store" value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-3 mb-4 w-full bg-blue-50">
-              <TabsTrigger value="store" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                店舗ID
-              </TabsTrigger>
-              <TabsTrigger value="email" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                メール
-              </TabsTrigger>
-              <TabsTrigger value="select" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-                店舗選択
-              </TabsTrigger>
-            </TabsList>
+        <CardContent className="space-y-6 pt-6">
+          <p className="text-center text-gray-600">メールアドレスとパスワードを入力してログインしてください</p>
 
-            {/* 店舗IDでのログイン */}
-            <TabsContent value="store">
-              <form onSubmit={handleStoreIdLogin}>
-                <div className="space-y-2">
-                  <Label htmlFor="storeId" className="flex items-center">
-                    <Store className="h-4 w-4 mr-2" />
-                    店舗ID
-                  </Label>
-                  <Input
-                    id="storeId"
-                    placeholder="店舗IDを入力してください"
-                    value={storeId}
-                    onChange={(e) => setStoreId(e.target.value)}
-                    className="border-blue-200 focus:border-blue-400"
-                  />
-                </div>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="store" className="flex items-center text-gray-700">
+                <Store className="h-4 w-4 mr-2 text-blue-600" />
+                店舗名
+              </Label>
+              <Select value={selectedStore} onValueChange={handleStoreChange}>
+                <SelectTrigger className="border-blue-200 focus:border-blue-400">
+                  <SelectValue placeholder="店舗を選択してください" />
+                </SelectTrigger>
+                <SelectContent>
+                  {stores.map((store) => (
+                    <SelectItem key={store.id} value={store.id}>
+                      {store.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-                <Button type="submit" className="w-full mt-6 bg-blue-600 hover:bg-blue-700" disabled={loading}>
-                  {loading ? "ログイン中..." : "ログイン"}
-                </Button>
-              </form>
-            </TabsContent>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center text-gray-700">
+                <User className="h-4 w-4 mr-2 text-blue-600" />
+                メールアドレス
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="example@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="border-blue-200 focus:border-blue-400"
+              />
+            </div>
 
-            {/* メール・パスワードでのログイン */}
-            <TabsContent value="email">
-              <form onSubmit={handleEmailLogin}>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="flex items-center">
-                      <User className="h-4 w-4 mr-2" />
-                      メールアドレス
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="メールアドレスを入力してください"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="border-blue-200 focus:border-blue-400"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="flex items-center">
-                      <Lock className="h-4 w-4 mr-2" />
-                      パスワード
-                    </Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="パスワードを入力してください"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="border-blue-200 focus:border-blue-400"
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full mt-6 bg-blue-600 hover:bg-blue-700" disabled={loading}>
-                  {loading ? "ログイン中..." : "ログイン"}
-                </Button>
-              </form>
-            </TabsContent>
-
-            {/* 店舗選択でのログイン */}
-            <TabsContent value="select">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="storeName" className="flex items-center">
-                    <Store className="h-4 w-4 mr-2" />
-                    店舗を選択
-                  </Label>
-                  <Select value={selectedStore} onValueChange={setSelectedStore}>
-                    <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                      <SelectValue placeholder="店舗を選択してください" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stores.map((store) => (
-                        <SelectItem key={store.id} value={store.id}>
-                          {store.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button
-                  className="w-full mt-6 bg-blue-600 hover:bg-blue-700"
-                  disabled={loading || !selectedStore}
-                  onClick={handleStoreNameLogin}
+            <div className="space-y-2">
+              <Label htmlFor="password" className="flex items-center text-gray-700">
+                <Lock className="h-4 w-4 mr-2 text-blue-600" />
+                パスワード
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="パスワードを入力"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="border-blue-200 focus:border-blue-400 pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  onClick={() => setShowPassword(!showPassword)}
                 >
-                  {loading ? "ログイン中..." : "ログイン"}
-                </Button>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
 
-          {error && (
-            <Alert className="mt-4 bg-red-50 border-red-200 text-red-800">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+            {error && (
+              <Alert className="bg-red-50 border-red-200 text-red-800">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2" disabled={loading}>
+              {loading ? "ログイン中..." : "ログイン"}
+            </Button>
+          </form>
 
           {/* 管理者ログインボタン */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
+          <div className="pt-2">
             <Button
               variant="outline"
               className="w-full border-blue-200 text-blue-700 hover:bg-blue-50"
               onClick={handleAdminLogin}
             >
-              管理者としてログイン
+              管理者ログイン
             </Button>
           </div>
         </CardContent>
