@@ -127,111 +127,123 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-100 to-white p-4">
-      <Card className="w-full max-w-md shadow-lg border-blue-100">
-        <CardHeader className="space-y-1 text-center bg-blue-600 text-white rounded-t-lg">
-          <CardTitle className="text-3xl font-bold tracking-tight">SPLASH'N'GO!</CardTitle>
-          <CardDescription className="text-blue-100 text-lg">備品発注システム</CardDescription>
-        </CardHeader>
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative"
+      style={{
+        backgroundImage: `url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-RNulptIJx0tUJFlgPmlYgkGgzPOljF.png')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundColor: "white",
+      }}
+    >
+      <div className="absolute inset-0 bg-white/80"></div>
+      <div className="relative z-10 w-full max-w-md">
+        <Card className="w-full shadow-lg border-blue-100">
+          <CardHeader className="space-y-1 text-center bg-blue-600 text-white rounded-t-lg">
+            <CardTitle className="text-3xl font-bold tracking-tight">SPLASH'N'GO!</CardTitle>
+            <CardDescription className="text-blue-100 text-lg">備品発注システム</CardDescription>
+          </CardHeader>
 
-        <CardContent className="space-y-6 pt-6">
-          <p className="text-center text-gray-600">メールアドレスとパスワードを入力してログインしてください</p>
+          <CardContent className="space-y-6 pt-6">
+            <p className="text-center text-gray-600">ログインしてください</p>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="store" className="flex items-center text-gray-700">
-                <Store className="h-4 w-4 mr-2 text-blue-600" />
-                店舗名
-              </Label>
-              <Select value={selectedStore} onValueChange={handleStoreChange}>
-                <SelectTrigger className="border-blue-200 focus:border-blue-400">
-                  <SelectValue placeholder="店舗を選択してください" />
-                </SelectTrigger>
-                <SelectContent>
-                  {stores.map((store) => (
-                    <SelectItem key={store.id} value={store.id}>
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center text-gray-700">
-                <User className="h-4 w-4 mr-2 text-blue-600" />
-                メールアドレス
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="example@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="border-blue-200 focus:border-blue-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center text-gray-700">
-                <Lock className="h-4 w-4 mr-2 text-blue-600" />
-                パスワード
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="パスワードを入力"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="border-blue-200 focus:border-blue-400 pr-10"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="store" className="flex items-center text-gray-700">
+                  <Store className="h-4 w-4 mr-2 text-blue-600" />
+                  店舗名
+                </Label>
+                <Select value={selectedStore} onValueChange={handleStoreChange}>
+                  <SelectTrigger className="border-blue-200 focus:border-blue-400">
+                    <SelectValue placeholder="店舗を選択してください" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {stores.map((store) => (
+                      <SelectItem key={store.id} value={store.id}>
+                        {store.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email" className="flex items-center text-gray-700">
+                  <User className="h-4 w-4 mr-2 text-blue-600" />
+                  メールアドレス
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="example@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="border-blue-200 focus:border-blue-400"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="flex items-center text-gray-700">
+                  <Lock className="h-4 w-4 mr-2 text-blue-600" />
+                  パスワード
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="パスワードを入力"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="border-blue-200 focus:border-blue-400 pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <Alert className="bg-red-50 border-red-200 text-red-800">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2" disabled={loading}>
+                {loading ? "ログイン中..." : "ログイン"}
+              </Button>
+            </form>
+
+            {/* 管理者ログインボタン */}
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                className="w-full border-blue-200 text-blue-700 hover:bg-blue-50"
+                onClick={handleAdminLogin}
+              >
+                管理者ログイン
+              </Button>
             </div>
+          </CardContent>
 
-            {error && (
-              <Alert className="bg-red-50 border-red-200 text-red-800">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2" disabled={loading}>
-              {loading ? "ログイン中..." : "ログイン"}
-            </Button>
-          </form>
-
-          {/* 管理者ログインボタン */}
-          <div className="pt-2">
-            <Button
-              variant="outline"
-              className="w-full border-blue-200 text-blue-700 hover:bg-blue-50"
-              onClick={handleAdminLogin}
-            >
-              管理者ログイン
-            </Button>
-          </div>
-        </CardContent>
-
-        <CardFooter>
-          <div className="w-full text-sm text-gray-500 bg-blue-50 p-3 rounded-md flex items-start">
-            <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" />
-            <p>
-              ログイン情報がわからない場合は、管理者にお問い合わせください。
-              <br />
-              <a href="mailto:info@splashbrothers.co.jp" className="text-blue-600 hover:underline">
-                info@splashbrothers.co.jp
-              </a>
-            </p>
-          </div>
-        </CardFooter>
-      </Card>
+          <CardFooter>
+            <div className="w-full text-sm text-gray-500 bg-blue-50 p-3 rounded-md flex items-start">
+              <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" />
+              <p>
+                ログイン情報がわからない場合は、管理者にお問い合わせください。
+                <br />
+                <a href="mailto:info@splashbrothers.co.jp" className="text-blue-600 hover:underline">
+                  info@splashbrothers.co.jp
+                </a>
+              </p>
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   )
 }
