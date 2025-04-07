@@ -142,7 +142,7 @@ export default function ProductsPage() {
         setProducts(productsWithConvertedUrls)
 
         // カテゴリーの抽出
-        const uniqueCategories = [...new Set(data.map((product: Product) => product.category))] as string[]
+        const uniqueCategories = [...new Set(data.map((product: Product) => product.category))]
         setCategories(uniqueCategories)
 
         // 初期選択状態を設定
@@ -528,7 +528,7 @@ export default function ProductsPage() {
   }
 
   // カテゴリーの順序を定義
-  const CATEGORY_ORDER = ["すべて", "販促グッズ", "アパレル", "液剤", "クロス"]
+  const CATEGORY_ORDER = ["すべて", "販促グッズ", "液剤"] // アパレルとクロスを削除
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

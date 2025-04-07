@@ -252,7 +252,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 発注確認メールを送信
     try {
       console.log("Preparing to send email to:", storeInfo.email)
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+      // baseUrlの取得方法を修正
+      const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
+        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+        : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+
+      console.log("Using base URL for API calls:", baseUrl)
+
       const emailResponse = await fetch(`${baseUrl}/api/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -353,7 +359,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const partnerEmailPromises = Object.values(partnerGroups).map(async (partnerInfo) => {
       try {
         console.log(`Sending email to partner: ${partnerInfo.name} (${partnerInfo.email})`)
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+        // baseUrlの取得方法を修正
+        const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
+          ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+          : process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+
+        console.log("Using base URL for partner email:", baseUrl)
 
         // パートナーメールの送信
         const partnerEmailResponse = await fetch(`${baseUrl}/api/send-partner-email`, {
